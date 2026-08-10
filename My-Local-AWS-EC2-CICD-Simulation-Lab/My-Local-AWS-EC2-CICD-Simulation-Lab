@@ -1,0 +1,1241 @@
+# Building a Local AWS EC2 CI/CD Simulation Lab with VMware Workstation
+
+## A Practical Guide to Building, Packaging, Pushing, and Deploying a Containerized Application Without AWS EC2
+
+### 1. Introduction
+
+Cloud platforms such as AWS provide powerful infrastructure for learning and implementing DevOps practices. However, one of the major barriers for beginners is cost.
+
+A learner may want to practice a complete CI/CD deployment workflow involving:
+
+* Git
+* Jenkins
+* Maven
+* Docker
+* Docker Hub
+* SSH
+* AWS EC2
+* Application deployment
+
+but may not initially have an AWS account, sufficient cloud credits, or the financial resources to maintain cloud infrastructure.
+
+To solve this problem, I designed a **local DevOps laboratory using VMware Workstation**.
+
+The laboratory uses two Ubuntu virtual machines:
+
+* **VM1 — Jenkins/Build Server**
+* **VM2 — Deployment Server**
+
+VM2 acts as a local replacement for an AWS EC2 instance.
+
+The objective was not to reproduce AWS internally, but to reproduce the **architecture, communication pattern, security concepts, and CI/CD workflow** that would normally be used when Jenkins deploys an application to an EC2 server.
+
+---
+
+# 2. The Architecture
+
+The final architecture looks like this:
+
+```text
+                        INTERNET
+                            |
+                            |
+                         GitHub
+                            |
+                            | Git Checkout
+                            ↓
+                    ┌─────────────────┐
+                    │      VM1        │
+                    │ Jenkins Server  │
+                    │                 │
+                    │ Maven           │
+                    │ Docker          │
+                    │ Git             │
+                    │ SSH Client      │
+                    └────────┬────────┘
+                             |
+                             | Build Application
+                             |
+                             ↓
+                     Docker Image Build
+                             |
+                             ↓
+                       Docker Hub
+                    ┌─────────────────┐
+                    │   Docker Hub    │
+                    │ Container Image  │
+                    └────────┬────────┘
+                             |
+                             | docker pull
+                             |
+                             ↓
+                    ┌─────────────────┐
+                    │      VM2        │
+                    │ Deployment      │
+                    │ Server          │
+                    │                 │
+                    │ Docker Engine   │
+                    │ SSH Server      │
+                    └────────┬────────┘
+                             |
+                             | Port 3080
+                             ↓
+                         Browser
+```
+
+The important concept is that **VM2 represents the role of an EC2 deployment server**.
+
+In a real AWS environment:
+
+```text
+Jenkins → EC2
+```
+
+In our local environment:
+
+```text
+Jenkins VM1 → Deployment VM2
+```
+
+The DevOps principles remain essentially the same.
+
+---
+
+# 3. Why Use Two Virtual Machines?
+
+Using two VMs gives us a more realistic DevOps environment than running everything on one machine.
+
+## VM1 — CI/Build Server
+
+VM1 is responsible for:
+
+* Jenkins
+* Git
+* Maven
+* Java
+* Docker
+* SSH client
+* Docker Hub authentication
+* Building the application
+* Building the Docker image
+* Pushing the image to Docker Hub
+* Connecting to VM2 through SSH
+* Triggering deployment
+
+VM1 represents our:
+
+> Jenkins/CI server
+
+---
+
+## VM2 — Deployment Server
+
+VM2 is responsible for:
+
+* Running Docker
+* Receiving deployment commands from VM1
+* Pulling Docker images
+* Running application containers
+* Exposing the application to the network
+
+VM2 represents our:
+
+> AWS EC2 application/deployment server
+
+---
+
+# 4. VMware Network Configuration
+
+Both virtual machines were configured inside VMware Workstation.
+
+The machines were placed on a network that allowed them to communicate.
+
+For example:
+
+```text
+VM1
+192.168.146.x
+
+        |
+        | VMware Network
+        |
+        ↓
+
+VM2
+192.168.146.138
+```
+
+We verified the IP address of each VM using:
+
+```bash
+hostname -I
+```
+
+or:
+
+```bash
+ip addr
+```
+
+The private IP address of VM2 was particularly important because Jenkins on VM1 needed to connect to VM2.
+
+---
+
+# 5. Testing VM-to-VM Communication
+
+Before configuring Jenkins, we confirmed that VM1 could communicate with VM2.
+
+From VM1:
+
+```bash
+ping -c 4 192.168.146.138
+```
+
+If the ping succeeds, the machines can communicate at the network level.
+
+We then tested SSH connectivity.
+
+```bash
+ssh username@192.168.146.138
+```
+
+This is important because the eventual Jenkins deployment process depends on SSH.
+
+---
+
+# 6. Configuring SSH Between VM1 and VM2
+
+The deployment process requires Jenkins on VM1 to communicate with VM2.
+
+The SSH model was:
+
+```text
+VM1
+Jenkins
+  |
+  | SSH
+  ↓
+VM2
+Deployment Server
+```
+
+An SSH key pair can be generated on VM1:
+
+```bash
+ssh-keygen -t ed25519
+```
+
+This produces:
+
+```text
+~/.ssh/id_ed25519
+~/.ssh/id_ed25519.pub
+```
+
+The private key remains on VM1.
+
+The public key is placed on VM2 in:
+
+```text
+~/.ssh/authorized_keys
+```
+
+This allows VM1 to authenticate to VM2 without requiring an interactive password.
+
+The connection can then be tested:
+
+```bash
+ssh username@192.168.146.138
+```
+
+Once passwordless SSH is working manually, Jenkins can use the same mechanism.
+
+---
+
+# 7. Security Consideration
+
+In AWS, an EC2 instance normally uses a **Security Group** to control inbound traffic.
+
+For example:
+
+```text
+Inbound Rule
+
+Protocol: TCP
+Port: 22
+Source: Jenkins Server
+```
+
+Our local VMware environment does not have AWS Security Groups.
+
+Therefore, we reproduced the concept using the Ubuntu firewall, UFW.
+
+On VM2:
+
+```bash
+sudo ufw status
+```
+
+SSH access can be restricted to VM1's IP:
+
+```bash
+sudo ufw allow from VM1_IP to any port 22 proto tcp
+```
+
+For example:
+
+```bash
+sudo ufw allow from 192.168.146.137 to any port 22 proto tcp
+```
+
+This gives us an important real-world security principle:
+
+> The deployment server should not unnecessarily expose SSH to everybody.
+
+---
+
+# 8. Source Code Management
+
+The application source code was stored in Git.
+
+The general workflow was:
+
+```text
+Developer
+   |
+   ↓
+Git Repository
+   |
+   ↓
+Jenkins
+```
+
+Jenkins was configured with access to the Git repository.
+
+The pipeline performs a checkout operation similar to:
+
+```groovy
+checkout scm
+```
+
+or:
+
+```groovy
+git branch: 'main',
+    url: 'REPOSITORY_URL'
+```
+
+The purpose is to ensure Jenkins always works with the latest source code from the selected branch.
+
+---
+
+# 9. Jenkins Pipeline
+
+The Jenkins pipeline becomes the central automation engine.
+
+The high-level pipeline was:
+
+```text
+Checkout
+   ↓
+Build Application
+   ↓
+Build Docker Image
+   ↓
+Push Docker Image
+   ↓
+SSH to VM2
+   ↓
+Pull Docker Image
+   ↓
+Stop Previous Container
+   ↓
+Run New Container
+   ↓
+Expose Application
+```
+
+This is the core CI/CD process.
+
+---
+
+# 10. Stage 1 — Checkout Code
+
+Jenkins first retrieves the source code from Git.
+
+Conceptually:
+
+```text
+GitHub
+   ↓
+Jenkins
+   ↓
+Workspace
+```
+
+The Jenkins workspace contains the application source code.
+
+For a Maven Java application, this might include:
+
+```text
+pom.xml
+src/
+Dockerfile
+Jenkinsfile
+```
+
+---
+
+# 11. Stage 2 — Build the Application
+
+After checkout, Jenkins builds the application using Maven.
+
+For example:
+
+```bash
+mvn clean package
+```
+
+Maven performs several activities:
+
+```text
+Clean previous build
+       ↓
+Compile source code
+       ↓
+Run tests
+       ↓
+Package application
+       ↓
+Generate JAR
+```
+
+For example, the resulting artifact could be:
+
+```text
+target/demo-app-1.1.9.jar
+```
+
+This represents the application artifact produced by the CI process.
+
+---
+
+# 12. Stage 3 — Build the Docker Image
+
+The next step is to package the application into a Docker image.
+
+The Dockerfile defines how the application should be packaged.
+
+A simplified example:
+
+```dockerfile
+FROM eclipse-temurin:21-jdk
+
+WORKDIR /app
+
+COPY target/demo-app-1.1.9.jar app.jar
+
+EXPOSE 8080
+
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+
+Jenkins then executes something similar to:
+
+```bash
+docker build -t azubuike1/demo-app:1.1.9-6 .
+```
+
+Docker reads the Dockerfile and produces an image.
+
+The result is:
+
+```text
+azubuike1/demo-app:1.1.9-6
+```
+
+---
+
+# 13. Understanding the Docker Image
+
+The Docker image contains everything necessary to run the application:
+
+```text
+Docker Image
+│
+├── Java Runtime
+├── Application JAR
+├── Application configuration
+└── Runtime instructions
+```
+
+This gives us an important deployment principle:
+
+> Build once and deploy the same artifact.
+
+Instead of rebuilding the application on VM2, VM2 simply receives the already-built image.
+
+---
+
+# 14. Stage 4 — Push Image to Docker Hub
+
+After successfully building the image, Jenkins authenticates to Docker Hub.
+
+The image is then pushed:
+
+```bash
+docker push azubuike1/demo-app:1.1.9-6
+```
+
+The architecture becomes:
+
+```text
+VM1
+Jenkins
+   |
+   | docker push
+   ↓
+Docker Hub
+   |
+   ↓
+azubuike1/demo-app:1.1.9-6
+```
+
+Docker Hub therefore acts as the **container image registry**.
+
+In a larger production environment, this could instead be:
+
+* Amazon ECR
+* GitHub Container Registry
+* GitLab Container Registry
+* Harbor
+* Nexus Repository
+
+---
+
+# 15. Why Docker Hub Is Important
+
+The registry creates separation between:
+
+```text
+BUILD
+```
+
+and:
+
+```text
+DEPLOYMENT
+```
+
+VM1 builds the image.
+
+Docker Hub stores the image.
+
+VM2 retrieves the image.
+
+Therefore:
+
+```text
+VM1
+BUILD
+  |
+  ↓
+Docker Hub
+REGISTRY
+  |
+  ↓
+VM2
+DEPLOY
+```
+
+This is a very important CI/CD architecture.
+
+---
+
+# 16. Stage 5 — Connect to VM2
+
+After the image has been pushed successfully, Jenkins connects to VM2 using SSH.
+
+Conceptually:
+
+```text
+Jenkins VM1
+     |
+     | SSH
+     ↓
+VM2
+```
+
+The Jenkins SSH credentials contain the private key required to authenticate against VM2.
+
+Jenkins can then execute remote commands.
+
+For example:
+
+```bash
+ssh user@192.168.146.138
+```
+
+---
+
+# 17. Stage 6 — Pull the Docker Image on VM2
+
+Once connected to VM2, Jenkins instructs Docker to pull the image from Docker Hub:
+
+```bash
+docker pull azubuike1/demo-app:1.1.9-6
+```
+
+The flow is:
+
+```text
+Docker Hub
+     |
+     | docker pull
+     ↓
+VM2 Docker Engine
+```
+
+VM2 does not need to compile the Java application.
+
+It simply retrieves the ready-made image.
+
+This is one of the major advantages of container-based deployment.
+
+---
+
+# 18. Stage 7 — Run the Container
+
+After pulling the image, VM2 starts the container.
+
+For example:
+
+```bash
+docker run -d \
+  --name demo-app \
+  -p 3080:8080 \
+  azubuike1/demo-app:1.1.9-6
+```
+
+The important part is:
+
+```text
+-p 3080:8080
+```
+
+This means:
+
+```text
+VM2 Port 3080
+      ↓
+Container Port 8080
+```
+
+The application is therefore accessible through VM2's IP address.
+
+---
+
+# 19. Understanding Docker Port Mapping
+
+Suppose VM2 has:
+
+```text
+192.168.146.138
+```
+
+and the container uses:
+
+```text
+8080
+```
+
+while Docker publishes:
+
+```text
+3080:8080
+```
+
+The complete flow is:
+
+```text
+Browser
+   |
+   | http://192.168.146.138:3080
+   ↓
+VM2
+Port 3080
+   |
+   | Docker NAT/port forwarding
+   ↓
+Container
+Port 8080
+   |
+   ↓
+Java Application
+```
+
+This was the final step that allowed the deployed application to be viewed through the browser.
+
+---
+
+# 20. Verifying the Running Container
+
+On VM2:
+
+```bash
+docker ps
+```
+
+We eventually obtained a running container similar to:
+
+```text
+CONTAINER ID   IMAGE                       PORTS
+3e070dd9fe49   azubuike1/demo-app:1.1.9-6  0.0.0.0:3080->3080/tcp
+```
+
+The important information is:
+
+```text
+0.0.0.0:3080->3080/tcp
+```
+
+This tells us that Docker published port 3080 on VM2.
+
+If the application itself listens on port 8080, the more appropriate mapping would be:
+
+```text
+0.0.0.0:3080->8080/tcp
+```
+
+and the container would be started using:
+
+```bash
+docker run -d \
+  -p 3080:8080 \
+  --name demo-app \
+  azubuike1/demo-app:1.1.9-6
+```
+
+---
+
+# 21. Testing the Application
+
+Before using the browser, we can test from VM2:
+
+```bash
+curl http://localhost:3080
+```
+
+If the application responds, the container and application are working.
+
+We can then open the application from the host computer:
+
+```text
+http://192.168.146.138:3080
+```
+
+The browser communicates with VM2, Docker forwards the request to the container, and the Java application responds.
+
+---
+
+# 22. Firewall Configuration
+
+If the application works from VM2 but cannot be accessed from the host computer, the firewall may be blocking port 3080.
+
+Check:
+
+```bash
+sudo ufw status
+```
+
+If necessary:
+
+```bash
+sudo ufw allow 3080/tcp
+```
+
+Then verify:
+
+```bash
+sudo ufw status
+```
+
+The security model is therefore:
+
+```text
+Port 22
+   ↓
+SSH
+   ↓
+Allow Jenkins/VM1
+
+Port 3080
+   ↓
+Application
+   ↓
+Allow required client/network access
+```
+
+---
+
+# 23. Complete End-to-End Pipeline
+
+The complete workflow we implemented can now be represented as:
+
+```text
+                  DEVELOPER
+                      |
+                      ↓
+                 Git Repository
+                      |
+                      ↓
+              ┌───────────────┐
+              │      VM1      │
+              │    Jenkins    │
+              └───────┬───────┘
+                      |
+                  Checkout
+                      |
+                      ↓
+                 Maven Build
+                      |
+                      ↓
+                Docker Build
+                      |
+                      ↓
+                Docker Login
+                      |
+                      ↓
+                 Docker Push
+                      |
+                      ↓
+              ┌───────────────┐
+              │  Docker Hub   │
+              │    Registry   │
+              └───────┬───────┘
+                      |
+                  Docker Pull
+                      |
+                      ↓
+              ┌───────────────┐
+              │      VM2      │
+              │  EC2 Simulator│
+              └───────┬───────┘
+                      |
+                  Docker Run
+                      |
+                      ↓
+                Port 3080
+                      |
+                      ↓
+                   Browser
+```
+
+---
+
+# 24. Mapping the Lab to AWS
+
+One of the most important learning outcomes is understanding how the local environment maps to AWS.
+
+| Local VMware Lab       | AWS Equivalent                       |
+| ---------------------- | ------------------------------------ |
+| VM1                    | Jenkins/CI server                    |
+| VM2                    | EC2 instance                         |
+| VMware private network | VPC/private networking concept       |
+| VM2 private IP         | EC2 private IP                       |
+| UFW                    | Security Group-like firewall control |
+| SSH                    | SSH into EC2                         |
+| SSH key                | EC2 key-pair authentication          |
+| Docker Engine          | Docker on EC2                        |
+| Docker Hub             | ECR/Container Registry               |
+| Jenkins                | CI/CD automation server              |
+| Docker image           | Deployable application artifact      |
+| Browser → VM2:3080     | Browser → EC2:application-port       |
+
+This is not a literal replacement for AWS infrastructure. Rather, it is a **local simulation of the deployment architecture and workflow**.
+
+---
+
+# 25. What We Have Successfully Demonstrated
+
+Through this laboratory, we have demonstrated the major components of a modern CI/CD deployment pipeline:
+
+### Source Control
+
+```text
+Git → Jenkins
+```
+
+### Continuous Integration
+
+```text
+Jenkins → Maven → Application Artifact
+```
+
+### Containerization
+
+```text
+Application → Docker Image
+```
+
+### Container Registry
+
+```text
+Docker Image → Docker Hub
+```
+
+### Continuous Deployment
+
+```text
+Jenkins → SSH → VM2
+```
+
+### Container Deployment
+
+```text
+Docker Hub → VM2 → docker pull → docker run
+```
+
+### Application Exposure
+
+```text
+VM2 → Port 3080 → Browser
+```
+
+---
+
+# 26. Why This Approach Is Valuable
+
+This laboratory removes one of the biggest barriers to DevOps learning: **cloud infrastructure cost**.
+
+A beginner does not necessarily need an AWS account to understand:
+
+* CI/CD
+* Jenkins pipelines
+* Git integration
+* Maven builds
+* Docker image creation
+* Container registries
+* SSH deployment
+* Remote server deployment
+* Linux firewall concepts
+* Docker networking
+* Application exposure
+
+These concepts can first be learned locally.
+
+Once the learner understands the architecture, moving from:
+
+```text
+VM2
+```
+
+to:
+
+```text
+AWS EC2
+```
+
+becomes much easier.
+
+The major difference becomes infrastructure configuration rather than completely learning a new deployment process.
+
+---
+
+# 27. What Would Change When Moving to AWS?
+
+Our local deployment:
+
+```text
+Jenkins VM1
+     |
+     | SSH
+     ↓
+VM2
+```
+
+could later become:
+
+```text
+Jenkins
+     |
+     | SSH
+     ↓
+AWS EC2
+```
+
+The Docker deployment commands can remain very similar:
+
+```bash
+docker pull IMAGE
+docker stop CONTAINER
+docker rm CONTAINER
+docker run ...
+```
+
+What changes are mainly:
+
+* EC2 provisioning
+* VPC/subnet
+* Security Groups
+* Public/private IP addressing
+* AWS key pairs
+* Internet Gateway/NAT configuration
+* IAM permissions
+* ECR instead of Docker Hub, if desired
+* DNS/domain configuration
+
+Therefore, the local lab provides a strong foundation before moving into AWS.
+
+---
+
+# 28. Lessons Learned
+
+The project demonstrates several important DevOps principles.
+
+### Principle 1 — Separate Build From Deployment
+
+The machine that builds the application does not have to be the machine that runs it.
+
+```text
+VM1 = Build
+VM2 = Deploy
+```
+
+### Principle 2 — Use an Artifact Registry
+
+Docker Hub provides a central location for the image.
+
+```text
+Build → Registry → Deployment
+```
+
+### Principle 3 — Automate Deployment
+
+Instead of manually copying files to VM2, Jenkins performs the deployment.
+
+### Principle 4 — Use SSH Securely
+
+SSH provides secure communication between Jenkins and the deployment server.
+
+### Principle 5 — Control Network Access
+
+Only required ports should be exposed.
+
+### Principle 6 — Build Once, Deploy the Same Artifact
+
+The image built and tested by Jenkins is the same image deployed to VM2.
+
+This reduces the possibility of differences between the build environment and deployment environment.
+
+---
+
+# 29. Possible Improvements
+
+The current laboratory can be extended further.
+
+### Versioned Docker Images
+
+Instead of using:
+
+```text
+latest
+```
+
+we use:
+
+```text
+1.1.9-6
+```
+
+This gives us traceability.
+
+For example:
+
+```text
+1.1.9-5
+1.1.9-6
+1.1.9-7
+```
+
+We can identify exactly which version is deployed.
+
+### Automated Rollback
+
+If version `1.1.9-7` fails:
+
+```text
+1.1.9-7
+    ↓
+FAIL
+    ↓
+Rollback
+    ↓
+1.1.9-6
+```
+
+### Health Checks
+
+Jenkins can verify that the application is actually running after deployment.
+
+For example:
+
+```bash
+curl http://192.168.146.138:3080
+```
+
+### Docker Compose
+
+The deployment can eventually be moved from:
+
+```bash
+docker run
+```
+
+to:
+
+```bash
+docker compose up -d
+```
+
+### Nginx
+
+We can introduce Nginx as a reverse proxy:
+
+```text
+Browser
+   ↓
+Nginx :80
+   ↓
+Application :8080
+```
+
+### HTTPS
+
+We can eventually add TLS/HTTPS.
+
+### Kubernetes
+
+The same container image could later be deployed to Kubernetes.
+
+---
+
+# 30. Final Architecture
+
+The complete learning journey can be summarized as:
+
+```text
+                         GitHub
+                           |
+                           |
+                       Git Checkout
+                           |
+                           ↓
+                 ┌───────────────────┐
+                 │       VM1         │
+                 │                   │
+                 │     Jenkins       │
+                 │       +           │
+                 │      Maven        │
+                 │       +           │
+                 │      Docker       │
+                 │       +           │
+                 │       SSH         │
+                 └─────────┬─────────┘
+                           |
+                           |
+                     Build Application
+                           |
+                           ↓
+                     Build Docker Image
+                           |
+                           ↓
+                     Push Docker Image
+                           |
+                           ↓
+                 ┌───────────────────┐
+                 │    Docker Hub     │
+                 │                   │
+                 │ demo-app:1.1.9-6  │
+                 └─────────┬─────────┘
+                           |
+                           |
+                       docker pull
+                           |
+                           ↓
+                 ┌───────────────────┐
+                 │       VM2         │
+                 │                   │
+                 │ Deployment Server  │
+                 │       +           │
+                 │  Docker Engine     │
+                 └─────────┬─────────┘
+                           |
+                      docker run
+                           |
+                           ↓
+                    Application
+                       :8080
+                           |
+                  Docker port mapping
+                           |
+                           ↓
+                       VM2:3080
+                           |
+                           ↓
+                       Browser
+```
+
+# 31. Conclusion
+
+This VMware-based laboratory demonstrates that meaningful DevOps and CI/CD experience does not have to begin with expensive cloud infrastructure.
+
+By using two local virtual machines, we created a realistic separation between:
+
+```text
+CI / BUILD
+```
+
+and:
+
+```text
+CD / DEPLOYMENT
+```
+
+VM1 performed the role of the automation/build server, while VM2 performed the role of the application deployment server normally represented by AWS EC2.
+
+The complete pipeline successfully followed the modern deployment pattern:
+
+```text
+Git
+ ↓
+Checkout
+ ↓
+Maven Build
+ ↓
+Docker Build
+ ↓
+Docker Image
+ ↓
+Docker Hub
+ ↓
+SSH
+ ↓
+VM2 / EC2 Simulation
+ ↓
+Docker Pull
+ ↓
+Docker Run
+ ↓
+Port Mapping
+ ↓
+Browser
+```
+
+The key lesson is not simply how to run an application on two VMs.
+
+The real lesson is understanding **how the different DevOps components communicate and how a CI/CD pipeline moves an application from source code to a running production-like environment**.
+
+Once this architecture is understood locally, transitioning to AWS EC2 becomes an infrastructure exercise rather than starting the entire DevOps journey from zero.
+
+> **Build locally. Understand the architecture. Automate the process. Then move to the cloud when the resources are available.**

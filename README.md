@@ -1,75 +1,116 @@
 # Anthony Abia | DevOps & Cloud Engineering Portfolio
 
-Welcome to my DevOps portfolio. This repository documents my practical learning, hands-on infrastructure projects, automation exercises, and continuous development in DevOps and cloud engineering.
+Welcome to my DevOps and Cloud Engineering portfolio. This repository showcases my hands-on projects in Linux administration, CI/CD automation, containerization, infrastructure operations, and cloud engineering.
 
-I am transitioning from Electrical/Electronics Engineering into technology, with a focus on building reliable infrastructure, automating delivery workflows, and developing practical cloud and containerization skills.
+I am transitioning from Electrical/Electronics Engineering into technology, with a focus on building reliable infrastructure, automating software delivery, and developing practical cloud and DevOps skills.
+
+My approach combines hands-on implementation, troubleshooting, documentation, and continuous learning.
 
 ## Technical Skills
 
-* **Version Control:** Git, GitHub, GitLab
-* **Operating Systems:** Linux, Ubuntu
-* **Containers:** Docker, Docker Compose
-* **Container Orchestration:** Kubernetes, kind
-* **Infrastructure as Code:** Terraform
-* **CI/CD:** Jenkins
-* **Cloud:** AWS, including EC2, VPC, and S3 fundamentals
-* **Scripting and Automation:** Bash and PowerShell fundamentals
-* **Build Tools:** Maven
+| Category | Technologies |
+|---|---|
+| Version Control | Git, GitHub, GitLab |
+| Operating Systems | Linux, Ubuntu |
+| Containers | Docker, Docker Compose |
+| Container Orchestration | Kubernetes, kind |
+| CI/CD | Jenkins |
+| Infrastructure as Code | Terraform |
+| Cloud Platforms | AWS fundamentals: EC2, VPC, S3 |
+| Build Tools | Maven |
+| Scripting and Automation | Bash, PowerShell fundamentals |
+| Virtualization | VMware Workstation |
 
-## Projects
+## Featured Projects
 
-### 1. Linux Administration Lab
+### 1. Local AWS EC2 CI/CD Simulation Lab
 
-Practical Linux administration exercises covering system monitoring, command-line operations, and troubleshooting.
+**A practical CI/CD pipeline using Jenkins, Maven, Docker, Docker Hub, and VMware-hosted Ubuntu virtual machines.**
 
-**Focus areas:** Linux fundamentals, system administration, Bash scripting.
+This project demonstrates how a software application can move through a build, test, packaging, containerization, image publishing, and deployment workflow in a local lab environment.
 
-Project directory: `01-Linux-Administration-Lab/`
-
-### 2. Local AWS EC2 CI/CD Simulation Lab
-
-A hands-on lab focused on practicing infrastructure and CI/CD concepts in a local learning environment.
-
-**Focus areas:** AWS EC2 concepts, CI/CD workflows, deployment fundamentals.
-
-Project directory: `My-Local-AWS-EC2-CICD-Simulation-Lab/`
-
-### 3. VMware Infrastructure Migration and Linux Disk Expansion
-
-Documenting the relocation of three Ubuntu virtual machines from a laptop's internal storage to an external HDD, followed by expanding a Linux root partition and filesystem.
+Instead of deploying to a paid AWS EC2 instance, the lab uses a dedicated Ubuntu virtual machine as the deployment target while practicing concepts relevant to remote-server deployments.
 
 **Key activities:**
+- Configured a Jenkins pipeline for application checkout and build automation.
+- Used Maven to build the Java application and run unit tests.
+- Built a Docker image and published it to Docker Hub.
+- Used SSH-based deployment concepts to deploy the application to a separate Ubuntu virtual machine.
+- Documented the architecture, deployment process, troubleshooting, and lessons learned.
+- Captured screenshots showing the pipeline stages and deployment results.
 
-* Migrating complete VMware virtual-machine folders using Windows PowerShell.
-* Verifying migrated virtual machines and their configuration files.
-* Expanding a VMware virtual disk from 20 GiB to 40 GiB.
-* Extending the Linux root partition with `growpart`.
-* Resizing the ext4 filesystem with `resize2fs`.
-* Troubleshooting disk-space and boot issues.
-* Documenting verification commands and operational precautions.
+**Technologies:** Jenkins, Git, Maven, Java, Docker, Docker Compose, Docker Hub, SSH, Linux, VMware.
 
-**Result:** Increased the `dev-server` root filesystem to approximately 30 GB, with approximately 19.2 GB available after expansion.
+**Explore the project:**
+- [Project README](03-Cloud-and-CI-CD/Local-aws-ec2-CI-CD-Lab/README.md)
+- [Jenkins Pipeline](03-Cloud-and-CI-CD/Local-aws-ec2-CI-CD-Lab/Jenkinsfile)
+- [Dockerfile](03-Cloud-and-CI-CD/Local-aws-ec2-CI-CD-Lab/Dockerfile)
+- [Docker Compose Configuration](03-Cloud-and-CI-CD/Local-aws-ec2-CI-CD-Lab/docker-compose.yml)
+- [Architecture Documentation](03-Cloud-and-CI-CD/Local-aws-ec2-CI-CD-Lab/docs/architecture.md)
+- [Deployment Guide](03-Cloud-and-CI-CD/Local-aws-ec2-CI-CD-Lab/docs/deployment-guide.md)
+- [Troubleshooting Guide](03-Cloud-and-CI-CD/Local-aws-ec2-CI-CD-Lab/docs/troubleshooting.md)
+- [Lessons Learned](03-Cloud-and-CI-CD/Local-aws-ec2-CI-CD-Lab/docs/lessons-learned.md)
+- [Pipeline and Deployment Screenshots](03-Cloud-and-CI-CD/Local-aws-ec2-CI-CD-Lab/screenshots/)
 
-Project documentation:
+### 2. VMware Infrastructure Migration and Linux Disk Expansion
 
-* [Project Overview](02-DevOps-Infrastructure-Operations/01-VMware-Migration-and-Linux-Disk-Expansion/README.md)
-* [VMware Migration Process](02-DevOps-Infrastructure-Operations/01-VMware-Migration-and-Linux-Disk-Expansion/migration-process.md)
-* [PowerShell Migration Commands](02-DevOps-Infrastructure-Operations/01-VMware-Migration-and-Linux-Disk-Expansion/migration-powershell.md)
-* [Linux Disk Expansion](02-DevOps-Infrastructure-Operations/01-VMware-Migration-and-Linux-Disk-Expansion/disk-expansion.md)
-* [Troubleshooting Notes](02-DevOps-Infrastructure-Operations/01-VMware-Migration-and-Linux-Disk-Expansion/troubleshooting.md)
+This project documents the migration of three Ubuntu virtual machines from a laptop's internal storage to an external hard drive, followed by expanding a Linux root partition and filesystem.
 
-## Learning Approach
+**Key activities:**
+- Migrated VMware virtual-machine folders using Windows PowerShell.
+- Verified migrated virtual machines and their configuration files.
+- Expanded a virtual disk from 20 GiB to 40 GiB.
+- Extended a Linux root partition using `growpart`.
+- Resized the ext4 filesystem using `resize2fs`.
+- Troubleshot disk-space and boot-related issues.
+- Documented verification commands and operational precautions.
 
-I focus on understanding the underlying concepts, implementing them in practical labs, troubleshooting errors, and documenting the procedures so they can be reproduced and improved.
+**Result:** Expanded the `dev-server` root filesystem to approximately 30 GB, with approximately 19.2 GB available after the operation.
 
-My portfolio represents hands-on learning and personal lab work. I aim to continue building production-relevant skills through practical projects and collaboration.
+**Project documentation:**
+- [Project Overview](02-DevOps-Infrastructure-Operations/01-VMware-Migration-and-Linux-Disk-Expansion/README.md)
+- [Migration Process](02-DevOps-Infrastructure-Operations/01-VMware-Migration-and-Linux-Disk-Expansion/migration-process.md)
+- [PowerShell Migration Commands](02-DevOps-Infrastructure-Operations/01-VMware-Migration-and-Linux-Disk-Expansion/migration-powershell.md)
+- [Linux Disk Expansion](02-DevOps-Infrastructure-Operations/01-VMware-Migration-and-Linux-Disk-Expansion/disk-expansion.md)
+- [Troubleshooting Notes](02-DevOps-Infrastructure-Operations/01-VMware-Migration-and-Linux-Disk-Expansion/troubleshooting.md)
+
+### 3. Linux Administration Lab
+
+A collection of practical Linux administration exercises focused on command-line operations, system monitoring, scripting, and troubleshooting.
+
+**Focus areas:**
+- Linux command-line fundamentals.
+- System monitoring and resource inspection.
+- Bash scripting.
+- Basic administration and troubleshooting.
+
+**Project directory:** [`01-Linux-Administration-Lab/`](01-Linux-Administration-Lab/)
+
+### 4. Local AWS CI/CD Simulation Guide
+
+An additional guide documenting the concepts behind building a local CI/CD laboratory that simulates aspects of an AWS EC2 deployment workflow.
+
+**Project directory:** [`My-Local-AWS-EC2-CICD-Simulation-Lab/`](My-Local-AWS-EC2-CICD-Simulation-Lab/)
+
+## Engineering Approach
+
+My learning process emphasizes:
+
+- Understanding the underlying technology rather than simply copying commands.
+- Building and testing practical solutions.
+- Troubleshooting failures systematically.
+- Automating repeatable tasks.
+- Documenting technical procedures clearly.
+- Improving reliability, security, and maintainability.
+
+These projects represent practical lab work and ongoing professional development. I aim to continue strengthening my skills through increasingly challenging projects and collaboration with experienced engineers.
 
 ## Career Objective
 
-I am seeking junior DevOps, cloud operations, and infrastructure opportunities where I can contribute my existing technical skills, learn from experienced engineers, and grow through real-world engineering challenges.
+I am seeking junior DevOps Engineer, Cloud Operations, and Infrastructure Support opportunities where I can contribute my existing technical foundation, learn from experienced engineers, and grow through practical engineering work.
 
-## Repository
+## Connect
 
-GitHub: [A-Tony1](https://github.com/A-Tony1)
+- **GitHub:** [A-Tony1](https://github.com/A-Tony1)
 
-*Learning continuously. Automating thoughtfully. Building reliable infrastructure
+*Learning continuously. Automating thoughtfully. Building reliable infrastructure.*
